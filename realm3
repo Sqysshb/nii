@@ -326,30 +326,26 @@ local function findClosestHumanoid()
     local count = 0
     local maxChecks = 500 -- Limit checks to prevent crash
     
-    -- Search in __GAME_CONTENT first (more efficient)
-    local gc = WS:FindFirstChild("__GAME_CONTENT")
-    if gc then
-        local ok, children = pcall(function() return gc:GetDescendants() end)
-        if ok and children then
-            for _, obj in ipairs(children) do
-                count = count + 1
-                if count > maxChecks then break end
-                
-                if obj:IsA("Humanoid") then
-                    local hrp = obj.Parent:FindFirstChild("HumanoidRootPart")
-                    if hrp and hrp:IsA("BasePart") then
-                        local character = obj.Parent
-                        if character ~= LP.Character then
-                            local hum = obj
-                            if hum and hum.Health > 0 then
-                                local playerHrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-                                if playerHrp then
-                                    local dist = (playerHrp.Position - hrp.Position).Magnitude
-                                    if dist < closestDist then
-                                        closestDist = dist
-                                        closest = hrp
-                                    end
-                                end
+    local ok, children = pcall(function() return WS:GetDescendants() end)
+    if not ok or not children then return nil end
+    
+    for _, obj in ipairs(children) do
+        count = count + 1
+        if count > maxChecks then break end
+        
+        if obj:IsA("Humanoid") then
+            local hrp = obj.Parent:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp:IsA("BasePart") then
+                local character = obj.Parent
+                if character ~= LP.Character then
+                    local hum = obj
+                    if hum and hum.Health > 0 then
+                        local playerHrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+                        if playerHrp then
+                            local dist = (playerHrp.Position - hrp.Position).Magnitude
+                            if dist < closestDist then
+                                closestDist = dist
+                                closest = hrp
                             end
                         end
                     end
