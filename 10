@@ -1,0 +1,185 @@
+-- ===== TRIAL STATE (düzeltilmiş) =====
+local TrialState = {}
+for diff in pairs(Trials) do
+    TrialState[diff] = {
+        autoJoin = false,
+        autoLeave = false,  -- YENİ: Auto Leave toggle
+        walk = false,
+        wave = 1,
+        leaveWave = 0,
+        prevCount = -1,
+        capturedPos = nil,
+        autoReturn = false,
+        teleported = false,
+        lastLog = 0,
+        listening = false
+    }
+end
+
+-- ===== TELEPORT (konum kontrolü yok) =====
+local function teleportTo(pos)
+    local char = LP.Character
+    if not char then
+        warn("[TELEPORT] Character not found.")
+        return false
+    end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        warn("[TELEPORT] HumanoidRootPart not found.")
+        return false
+    end
+    hrp.CFrame = CFrame.new(pos)
+    pcall(function() hrp.AssemblyLinearVelocity = Vector3.new() end)
+    return true
+end
+
+-- ... (getCountdownLabel, parseCountdown, findTrialMob aynı) ...
+
+-- ===== AUTO JOIN SAYAÇ (aynı) =====
+task.spawn(function()
+    while not env.NIStop do
+        for diff, st in pairs(TrialState) do
+            if st.autoJoin then
+                local lbl = getCountdownLabel(diff)
+                if lbl then
+                    if not st.listening then
+                        print("[AUTO JOIN "..diff.."] Countdown listening started.")
+                        st.listening = true
+                    end
+                    local sec = parseCountdown(lbl.Text)
+                    if os.time() - st.lastLog >= 60 then
+                        if sec > 0 then
+                            print("[AUTO JOIN "..diff.."] "..sec.." seconds until trial opens.")
+                        else
+                            print("[AUTO JOIN "..diff.."] Countdown finished, teleporting...")
+                        end
+                        st.lastLog = os.time()
+                    end
+                    if sec == 0 and not st.teleported then
+                        local ok = teleportTo(Trials[diff].coord)
+                        if ok then
+                            print("[AUTO JOIN "..diff.."] Teleport successful!")
+                            st.teleported = true
+                        else
+                            warn("[AUTO JOIN "..diff.."] Teleport failed!")
+                        end
+                    end
+                    if sec > 0 then st.teleported = false end
+                else
+                    if os.time() - st.lastLog >= 30 then
+                        warn("[AUTO JOIN "..diff.."] Countdown label not found!")
+                        st.lastLog = os.time()
+                    end
+                end
+            else
+                st.listening = false
+            end
+        end
+        task.wait(5)
+    end
+end)
+
+-- ===== GRIND + WAVE + AUTO LEAVE (düzeltilmiş) =====
+for diff, data in pairs(Trials) do
+    local st = TrialState[diff]
+    task.spawn(function()
+        while not env.NIStop do
+            if st.walk then
+                local char = LP.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then task.wait(0.3); continue end
+                local room = WS:FindFirstChild("__GAME_CONTENT") and WS.__GAME_CONTENT:FindFirstChild("Trials") and WS.__GAME_CONTENT.Trials:FindFirstChild(data.room)
+                if not room then task.wait(0.3); continue end
+                local target = findTrialMob(diff)
+                local alive = 0
+                for _, v in ipairs(room:GetDescendants()) do
+                    if v:IsA("Humanoid") and v.Health > 0 and v.Parent ~= char then alive = alive + 1 end
+                end
+                if target and (hrp.Position - target.Position).Magnitude > 5 then
+                    local tw = TS:Create(hrp, TweenInfo.new(0.3, Enum.EasingStyle.Linear), {CFrame = CFrame.new(target.Position)})
+                    tw:Play(); tw.Completed:Wait()
+                end
+                if st.prevCount > 0 and alive == 0 then
+                    st.wave = st.wave + 1
+                    print("["..diff.." WAVE] Wave "..st.wave)
+                    -- AUTO LEAVE: hem toggle açık hem wave değerine ulaşıldıysa
+                    if st.autoLeave and st.leaveWave > 0 and st.wave >= st.leaveWave then
+                        print("[AUTO LEAVE "..diff.."] Leaving trial at wave "..st.wave)
+                        pcall(function() game:GetService("ReplicatedStorage").__Net.MainRemote:FireServer("LeaveTrial") end)
+                        if st.autoReturn and st.capturedPos then
+                            teleportTo(st.capturedPos)
+                        end
+                        st.walk = false
+                        -- UI toggle'ı da kapat
+                        pcall(function()
+                            if Rayfield and Rayfield.Flags then
+                                Rayfield.Flags["trialWalk_"..diff] = false
+                            end
+                        end)
+                    end
+                end
+                st.prevCount = alive
+            end
+            task.wait(0.3)
+        end
+    end)
+end
+
+-- ===== TRIAL SEKMELERİ (düzeltilmiş UI) =====
+for _, diff in ipairs({"Hard","Medium","Easy"}) do
+    local tab = TrialTabs[diff]
+    local st = TrialState[diff]
+    
+    tab:CreateSection("Auto Join")
+    tab:CreateToggle({ 
+        Name = "Auto Join (Countdown)", 
+        Flag = "autoJoin_"..diff,
+        Callback = function(v) st.autoJoin = v end 
+    })
+    
+    tab:CreateSection("Grind")
+    tab:CreateToggle({ 
+        Name = "Trial Walk", 
+        Flag = "trialWalk_"..diff,
+        Callback = function(v) 
+            st.walk = v
+            if v then 
+                st.wave = 1
+                st.prevCount = -1
+            end
+        end 
+    })
+    
+    tab:CreateSection("Auto Leave")
+    tab:CreateToggle({ 
+        Name = "Auto Leave", 
+        Flag = "autoLeave_"..diff,
+        Callback = function(v) st.autoLeave = v end 
+    })
+    tab:CreateSlider({ 
+        Name = "Leave after wave", 
+        Range = {1, 40}, 
+        Increment = 1, 
+        CurrentValue = 5,
+        Flag = "leaveWave_"..diff,
+        Callback = function(v) st.leaveWave = v end 
+    })
+    
+    tab:CreateSection("Capture & Return")
+    tab:CreateButton({ 
+        Name = "Capture Point", 
+        Callback = function()
+            local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then 
+                st.capturedPos = hrp.Position
+                print("["..diff.."] Position captured: "..tostring(st.capturedPos))
+                Rayfield:Notify({Title="Capture", Content="Position saved for "..diff.."!", Duration=3, Image="info"})
+            end
+        end 
+    })
+    tab:CreateToggle({ 
+        Name = "Auto Old Position", 
+        Flag = "autoReturn_"..diff,
+        Callback = function(v) st.autoReturn = v end 
+    })
+end
