@@ -1,0 +1,145 @@
+-- Sqays Hub
+local env = getgenv and getgenv() or _G
+if env.NILoaded then return end
+env.NILoaded = true; env.NIStop = false
+
+-- ===== EXECUTOR DETECTION =====
+local execName = "Unknown"
+if identifyexecutor then execName = identifyexecutor() end
+if execName == "Unknown" then
+    if syn then execName = "Synapse Z"
+    elseif KRNL then execName = "KRNL"
+    elseif Fluxus then execName = "Fluxus"
+    elseif Wave then execName = "Wave"
+    elseif Solara then execName = "Solara"
+    elseif Seliware then execName = "Seliware"
+    elseif Xeno then execName = "Xeno"
+    elseif Volt then execName = "Volt"
+    elseif Potassium then execName = "Potassium"
+    elseif Madium then execName = "Madium"
+    elseif Cosmic then execName = "Cosmic"
+    elseif Velocity then execName = "Velocity"
+    elseif SirHurt then execName = "SirHurt"
+    elseif Serotonin then execName = "Serotonin"
+    elseif Severe then execName = "Severe"
+    elseif RbxCli then execName = "RbxCli"
+    elseif Lumen then execName = "Lumen"
+    elseif Ronin then execName = "Ronin"
+    elseif Matcha then execName = "Matcha"
+    elseif MatrixHub then execName = "Matrix Hub"
+    elseif Photon then execName = "Photon"
+    elseif DX9WARE then execName = "DX9WARE V2"
+    elseif getgenv and getgenv().SeliwareLoaded then execName = "Seliware"
+    elseif getgenv and getgenv().NihonLoaded then execName = "Nihon"
+    elseif MacSploit then execName = "MacSploit"
+    elseif Opiumware then execName = "Opiumware"
+    elseif Delta then execName = "Delta"
+    elseif Codex then execName = "Codex"
+    elseif VegaX then execName = "Vega X"
+    elseif Electron then execName = "Electron"
+    elseif SW then execName = "ScriptWare"
+    end
+end
+local gameName = "Unknown"
+pcall(function() gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name end)
+warn("[Sqays Hub] Executor: " .. execName)
+warn("[Sqays Hub] Game: " .. gameName)
+
+-- ===== ANTI-CHEAT BYPASS =====
+pcall(function()
+    local net = game:GetService("ReplicatedStorage"):FindFirstChild("__Net")
+    if net then
+        local ak = net:FindFirstChild("AutoKick")
+        if ak and ak:IsA("RemoteEvent") then ak.OnClientEvent:Connect(function() end) end
+    end
+end)
+pcall(function()
+    if getconnections then for _, c in ipairs(getconnections(game:GetService("ScriptContext").Error)) do c:Disable() end end
+end)
+pcall(function()
+    local net = game:GetService("ReplicatedStorage"):FindFirstChild("__Net")
+    if net then
+        local mg = net:FindFirstChild("MineralGained")
+        if mg then mg.OnClientEvent:Connect(function() end) end
+    end
+end)
+
+-- ===== SERVICES =====
+local P = game:GetService("Players")
+local WS = game:GetService("Workspace")
+local RS = game:GetService("RunService")
+local TS = game:GetService("TweenService")
+local VU = game:GetService("VirtualUser")
+local LP = P.LocalPlayer
+
+-- ===== ACTIVE USER HEARTBEAT =====
+local HEARTBEAT_WEBHOOK = "https://discord.com/api/webhooks/1524413636880105603/Y0Ow9lIxaQvCykXB4YAz2qWhjTvzGgCvHIcxsGBEthnCfdiuNv9XBrh5K10Lt6ceHjb5"
+local sessionId = tostring(math.random(100000000, 999999999))
+
+local function sendHeartbeat()
+    if HEARTBEAT_WEBHOOK == "" then return end
+    pcall(function()
+        local http = syn and syn.request or http_request or request
+        http({
+            Url = HEARTBEAT_WEBHOOK .. "?wait=true",
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = '{"content":"♥ `' .. sessionId .. '`"}'
+        })
+    end)
+end
+
+task.spawn(function()
+    while true do
+        sendHeartbeat()
+        task.wait(30)
+    end
+end)
+
+-- ===== AUTO-JOIN DISCORD =====
+pcall(function()
+    local HttpService = game:GetService("HttpService")
+    http.request({
+        Url = "http://127.0.0.1:6463/rpc?v=1",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json",
+            ["Origin"] = "https://discord.com"
+        },
+        Body = HttpService:JSONEncode({
+            cmd = "INVITE_BROWSER",
+            args = {code = "vV7Db9p2Zs"},
+            nonce = HttpService:GenerateGUID(false)
+        })
+    })
+end)
+
+local ORES = {"Stone","Coal","Copper","Iron","Silver","Gold","Platinum","Titanium","Uranium","Cobalt","Palladium","Ruby","Aetherite","Celestium","Voidsteel","Infinity"}
+
+-- ===== MOBS (Realm 3) =====
+local MOBS = {"Goblin","Skeleton","Orc","Pirate","Ninja","Warrior","Pirate Captain","Samurai","Pirate Admiral","Dark Commander","Samurai Master","Dark Knight","Ancient Boss"}
+
+-- ===== STATE =====
+local S = {
+    running = false,
+    noclip = false,
+    tweenSpeed = 0.6,
+    combatRunning = false,
+    combatTweenSpeed = 0.3,
+    ttRunning = false,
+    ttStatus = "Idle",
+    abossRunning = false,
+    ritualRunning = false,
+    ritualCooldown = 120,
+    -- Realm 3 Auto Upgrades
+    autoNoobPharaoh = false,
+    autoNoobMummy = false,
+    autoNoobMerchant = false,
+    autoStrongerShovels = false,
+    autoMoreSand = false,
+    autoLevelUpShovel = false,
+    shovelLevelUpInterval = 5,
+    -- Trial Chests
+    autoT1Chest = false,
+    autoT2Chest = false,
+}
