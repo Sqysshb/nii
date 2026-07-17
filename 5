@@ -1,0 +1,1235 @@
+-- Sqays Hub
+local env = getgenv and getgenv() or _G
+if env.NILoaded then return end
+env.NILoaded = true; env.NIStop = false
+
+-- ===== EXECUTOR DETECTION =====
+local execName = "Unknown"
+if identifyexecutor then execName = identifyexecutor() end
+if execName == "Unknown" then
+    if syn then execName = "Synapse Z"
+    elseif KRNL then execName = "KRNL"
+    elseif Fluxus then execName = "Fluxus"
+    elseif Wave then execName = "Wave"
+    elseif Solara then execName = "Solara"
+    elseif Seliware then execName = "Seliware"
+    elseif Xeno then execName = "Xeno"
+    elseif Volt then execName = "Volt"
+    elseif Potassium then execName = "Potassium"
+    elseif Madium then execName = "Madium"
+    elseif Cosmic then execName = "Cosmic"
+    elseif Velocity then execName = "Velocity"
+    elseif SirHurt then execName = "SirHurt"
+    elseif Serotonin then execName = "Serotonin"
+    elseif Severe then execName = "Severe"
+    elseif RbxCli then execName = "RbxCli"
+    elseif Lumen then execName = "Lumen"
+    elseif Ronin then execName = "Ronin"
+    elseif Matcha then execName = "Matcha"
+    elseif MatrixHub then execName = "Matrix Hub"
+    elseif Photon then execName = "Photon"
+    elseif DX9WARE then execName = "DX9WARE V2"
+    elseif getgenv and getgenv().SeliwareLoaded then execName = "Seliware"
+    elseif getgenv and getgenv().NihonLoaded then execName = "Nihon"
+    elseif MacSploit then execName = "MacSploit"
+    elseif Opiumware then execName = "Opiumware"
+    elseif Delta then execName = "Delta"
+    elseif Codex then execName = "Codex"
+    elseif VegaX then execName = "Vega X"
+    elseif Electron then execName = "Electron"
+    elseif SW then execName = "ScriptWare"
+    end
+end
+local gameName = "Unknown"
+pcall(function() gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name end)
+warn("[Sqays Hub] Executor: " .. execName)
+warn("[Sqays Hub] Game: " .. gameName)
+
+-- ===== ANTI-CHEAT BYPASS =====
+pcall(function()
+    local net = game:GetService("ReplicatedStorage"):FindFirstChild("__Net")
+    if net then
+        local ak = net:FindFirstChild("AutoKick")
+        if ak and ak:IsA("RemoteEvent") then ak.OnClientEvent:Connect(function() end) end
+    end
+end)
+pcall(function()
+    if getconnections then for _, c in ipairs(getconnections(game:GetService("ScriptContext").Error)) do c:Disable() end end
+end)
+pcall(function()
+    local net = game:GetService("ReplicatedStorage"):FindFirstChild("__Net")
+    if net then
+        local mg = net:FindFirstChild("MineralGained")
+        if mg then mg.OnClientEvent:Connect(function() end) end
+    end
+end)
+
+-- ===== SERVICES =====
+local P = game:GetService("Players")
+local WS = game:GetService("Workspace")
+local RS = game:GetService("RunService")
+local TS = game:GetService("TweenService")
+local VU = game:GetService("VirtualUser")
+local LP = P.LocalPlayer
+
+-- ===== ACTIVE USER HEARTBEAT =====
+local HEARTBEAT_WEBHOOK = "https://discord.com/api/webhooks/1524413636880105603/Y0Ow9lIxaQvCykXB4YAz2qWhjTvzGgCvHIcxsGBEthnCfdiuNv9XBrh5K10Lt6ceHjb5"
+local sessionId = tostring(math.random(100000000, 999999999))
+
+local function sendHeartbeat()
+    if HEARTBEAT_WEBHOOK == "" then return end
+    pcall(function()
+        local http = syn and syn.request or http_request or request
+        http({
+            Url = HEARTBEAT_WEBHOOK .. "?wait=true",
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = '{"content":"♥ `' .. sessionId .. '`"}'
+        })
+    end)
+end
+
+task.spawn(function()
+    while true do
+        sendHeartbeat()
+        task.wait(30)
+    end
+end)
+
+-- ===== AUTO-JOIN DISCORD =====
+pcall(function()
+    local HttpService = game:GetService("HttpService")
+    http.request({
+        Url = "http://127.0.0.1:6463/rpc?v=1",
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json",
+            ["Origin"] = "https://discord.com"
+        },
+        Body = HttpService:JSONEncode({
+            cmd = "INVITE_BROWSER",
+            args = {code = "vV7Db9p2Zs"},
+            nonce = HttpService:GenerateGUID(false)
+        })
+    })
+end)
+
+local ORES = {"Stone","Coal","Copper","Iron","Silver","Gold","Platinum","Titanium","Uranium","Cobalt","Palladium","Ruby","Aetherite","Celestium","Voidsteel","Infinity"}
+
+-- ===== MOBS (Realm 3) =====
+local MOBS = {"Goblin","Skeleton","Orc","Pirate","Ninja","Warrior","Pirate Captain","Samurai","Pirate Admiral","Dark Commander","Samurai Master","Dark Knight","Ancient Boss"}
+
+-- ===== STATE =====
+local S = {
+    running = false,
+    noclip = false,
+    tweenSpeed = 0.6,
+    combatRunning = false,
+    combatTweenSpeed = 0.3,
+    ttRunning = false,
+    ttStatus = "Idle",
+    abossRunning = false,
+    ritualRunning = false,
+    ritualCooldown = 120,
+    -- Realm 3 Auto Upgrades
+    autoNoobPharaoh = false,
+    autoNoobMummy = false,
+    autoNoobMerchant = false,
+    autoStrongerShovels = false,
+    autoMoreSand = false,
+    autoLevelUpShovel = false,
+    shovelLevelUpInterval = 5,
+    -- Trial Chests
+    autoT1Chest = false,
+    autoT2Chest = false,
+}
+
+-- ===== NO CLIP =====
+local nc1, nc2, fixedY
+local function noclip(on)
+    S.noclip = on
+    local c = LP.Character or LP.CharacterAdded:Wait()
+    local hrp = c:WaitForChild("HumanoidRootPart", 5)
+    local hum = c:WaitForChild("Humanoid", 5)
+    if not hrp or not hum then return end
+    if on then
+        fixedY = hrp.Position.Y
+        hum.JumpPower = 0
+        hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        if not nc1 then nc1 = RS.Stepped:Connect(function()
+            if S.noclip and LP.Character then for _, v in ipairs(LP.Character:GetDescendants()) do if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end end end
+        end) end
+        if not nc2 then nc2 = RS.Heartbeat:Connect(function()
+            if not S.noclip then return end
+            pcall(function()
+                local char = LP.Character
+                if not char then return end
+                local root = char:FindFirstChild("HumanoidRootPart")
+                local h = char:FindFirstChildOfClass("Humanoid")
+                if not root or not h then return end
+                h.Jump = false
+                if math.abs(root.Position.Y - fixedY) > 0.5 then
+                    root.CFrame = CFrame.new(Vector3.new(root.Position.X, fixedY, root.Position.Z)) * root.CFrame.Rotation
+                end
+                root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+            end)
+        end) end
+    else
+        if nc1 then nc1:Disconnect(); nc1 = nil end
+        if nc2 then nc2:Disconnect(); nc2 = nil end
+        hum.JumpPower = 50; hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+    end
+end
+
+-- ===== ANTI-AFK =====
+local afkConn
+local function antiAFK(on)
+    if afkConn then afkConn:Disconnect(); afkConn = nil end
+    if not on then return end
+    afkConn = LP.Idled:Connect(function() pcall(function() VU:CaptureController(); VU:ClickButton2(Vector2.new()) end) end)
+end
+antiAFK(true)
+
+-- ===== MOVEMENT =====
+local activeTween = nil
+
+local function isCloseEnough(hrp, orePos, threshold)
+    if not hrp then return false end
+    local d = Vector3.new(orePos.X - hrp.Position.X, 0, orePos.Z - hrp.Position.Z)
+    return d.Magnitude <= threshold
+end
+
+local function tweenTo(pos, customSpeed)
+    local char = LP.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp then return end
+    if isCloseEnough(hrp, pos, 3) then return end
+    if activeTween then pcall(function() activeTween:Cancel() end); activeTween = nil end
+    local speed = customSpeed or S.tweenSpeed
+    local tw = TS:Create(hrp, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {CFrame = CFrame.new(pos.X, pos.Y, pos.Z)})
+    activeTween = tw
+    tw:Play()
+    tw.Completed:Wait()
+    activeTween = nil
+    pcall(function() hrp.AssemblyLinearVelocity = Vector3.new() end)
+    if hum then hum.PlatformStand = false; hum.Sit = false end
+end
+
+local function glideTo(pos, speed)
+    local char = LP.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if activeTween then pcall(function() activeTween:Cancel() end); activeTween = nil end
+    local tw = TS:Create(hrp, TweenInfo.new(speed or S.tweenSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(pos.X, pos.Y, pos.Z)})
+    activeTween = tw
+    tw:Play()
+    task.spawn(function() tw.Completed:Wait(); activeTween = nil end)
+end
+
+local function moveToOre(orePos, hrp)
+    if not orePos or not hrp then return end
+    if isCloseEnough(hrp, orePos, 3) then return end
+    pcall(tweenTo, Vector3.new(orePos.X, orePos.Y, orePos.Z))
+end
+
+-- ===== ORE DETECTION =====
+local function isOreReady(ore)
+    if not ore or not ore.Parent then return false end
+    if not ore:FindFirstChild("Rock") then return false end
+    local ui = ore:FindFirstChild("OresTopUI")
+    if ui then local bar = ui:FindFirstChild("Bar")
+        if bar then local hp = bar:FindFirstChild("Health")
+            if hp and hp.Text == "Respawning..." then return false end
+        end
+    end
+    return true
+end
+
+local function getOrePosition(ore)
+    local rock = ore:FindFirstChild("Rock")
+    if rock and rock:IsA("BasePart") then
+        return rock.Position
+    end
+    for _, child in ipairs(ore:GetChildren()) do
+        if child:IsA("BasePart") then return child.Position end
+    end
+    local ok, pivot = pcall(function() return ore:GetPivot() end)
+    if ok and pivot then return pivot.Position end
+    return nil
+end
+
+local function findBestOre()
+    local gc = WS:FindFirstChild("__GAME_CONTENT")
+    local of = gc and gc:FindFirstChild("Ores")
+    if not of then return nil end
+    for i = #ORES, 1, -1 do
+        if S["m" .. ORES[i]] then
+            local children = nil
+            pcall(function() children = of:GetChildren() end)
+            if not children then return nil end
+            for _, o in ipairs(children) do
+                if o.Name == ORES[i] and isOreReady(o) then return o end
+            end
+        end
+    end
+    return nil
+end
+
+local function isInMine()
+    local gc = WS:FindFirstChild("__GAME_CONTENT")
+    if not gc then return false end
+    local of = gc:FindFirstChild("Ores")
+    if not of then return false end
+    local ok, children = pcall(function() return of:GetChildren() end)
+    if not ok or not children then return false end
+    return #children > 0
+end
+
+local function loop()
+    while S.running and not env.NIStop do
+        if not isInMine() then task.wait(0.3); continue end
+        local any = false
+        for _, n in ipairs(ORES) do if S["m"..n] then any = true; break end end
+        if not any then task.wait(0.1); continue end
+        local ore = findBestOre()
+        if not ore then task.wait(0.1); continue end
+        local c = LP.Character
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        local hum = c and c:FindFirstChild("Humanoid")
+        if not hrp or not hum or hum.Health <= 0 then task.wait(0.1); continue end
+        local orePos = getOrePosition(ore)
+        if not orePos then task.wait(0.1); continue end
+        moveToOre(orePos, hrp)
+        if not S.running or env.NIStop then break end
+        local waitStart = tick()
+        while S.running and not env.NIStop do
+            local ready = false
+            pcall(function() ready = isOreReady(ore) end)
+            if not ready then break end
+            if tick() - waitStart > 40 then break end
+            task.wait(0.05)
+        end
+    end
+end
+
+-- ===== MOB DETECTION =====
+local function isMobAlive(mob)
+    if not mob or not mob.Parent then return false end
+    local hum = mob:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        for _, d in ipairs(mob:GetDescendants()) do
+            if d:IsA("Humanoid") then hum = d; break end
+        end
+    end
+    if hum then return hum.Health > 0 end
+    for _, child in ipairs(mob:GetDescendants()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            local txt = child.Text or ""
+            if txt:find("Respawning") or txt:find("Dead") then return false end
+        end
+    end
+    return true
+end
+
+local function getMobPosition(mob)
+    local hrp = mob:FindFirstChild("HumanoidRootPart")
+    if hrp then return hrp.Position end
+    for _, child in ipairs(mob:GetDescendants()) do
+        if child:IsA("BasePart") and child.Name == "HumanoidRootPart" then
+            return child.Position
+        end
+    end
+    if mob.PrimaryPart then return mob.PrimaryPart.Position end
+    for _, child in ipairs(mob:GetChildren()) do
+        if child:IsA("BasePart") then return child.Position end
+    end
+    local ok, pivot = pcall(function() return mob:GetPivot() end)
+    if ok and pivot then return pivot.Position end
+    return nil
+end
+
+local function findBestMob()
+    local gc = WS:FindFirstChild("__GAME_CONTENT")
+    local mf = gc and gc:FindFirstChild("Mobs")
+    if not mf then return nil, nil, nil end
+    local children = mf:GetChildren()
+    local best, bestHRP, bestHum, bestPri = nil, nil, nil, 0
+    for _, m in ipairs(children) do
+        local pri = 0
+        for i = #MOBS, 1, -1 do
+            if m.Name == MOBS[i] and S["c" .. MOBS[i]] then pri = i; break end
+        end
+        if pri > bestPri then
+            local hum = m:FindFirstChildOfClass("Humanoid")
+            if not hum then
+                for _, d in ipairs(m:GetDescendants()) do
+                    if d:IsA("Humanoid") then hum = d; break end
+                end
+            end
+            if hum and hum.Health > 0 then
+                local hrp = m:FindFirstChild("HumanoidRootPart")
+                if not hrp then
+                    for _, d in ipairs(m:GetDescendants()) do
+                        if d:IsA("BasePart") and d.Name=="HumanoidRootPart" then hrp=d; break end
+                    end
+                end
+                best, bestHRP, bestHum, bestPri = m, hrp, hum, pri
+            end
+        end
+    end
+    return best, bestHRP, bestHum
+end
+
+local function isInRealm3()
+    local gc = WS:FindFirstChild("__GAME_CONTENT")
+    if not gc then return false end
+    local mf = gc:FindFirstChild("Mobs") or gc:FindFirstChild("Trials")
+    if not mf then return false end
+    local ok, children = pcall(function() return mf:GetChildren() end)
+    if not ok or not children then return false end
+    return #children > 0
+end
+
+local function combatLoop()
+    while S.combatRunning and not env.NIStop do
+        if not isInRealm3() then task.wait(0.3); continue end
+        local any = false
+        for _, n in ipairs(MOBS) do if S["c"..n] then any = true; break end end
+        if not any then task.wait(0.1); continue end
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then task.wait(0.1); continue end
+        local mob, mobHRP, mobHum = findBestMob()
+        if not mob then task.wait(0.1); continue end
+        while mob and S.combatRunning do
+            local mobPos = mobHRP and mobHRP.Position
+            if not mobPos then mobPos = getMobPosition(mob) end
+            if mobPos and not isCloseEnough(hrp, mobPos, 5) then
+                glideTo(mobPos, S.combatTweenSpeed)
+            end
+            while S.combatRunning and mob do
+                if mobHum and mobHum.Health <= 0 then break end
+                if not isMobAlive(mob) then break end
+                task.wait(0.05)
+            end
+            mob, mobHRP, mobHum = findBestMob()
+        end
+    end
+end
+
+-- ===== ANCIENT BOSS =====
+local function hasAncientFragment()
+    local bp = LP:FindFirstChild("Backpack")
+    if bp then
+        for _, item in ipairs(bp:GetChildren()) do
+            local n = item.Name:lower()
+            if n:find("ancient") or n:find("fragment") or n:find("shard") then return true end
+        end
+    end
+    local char = LP.Character
+    if char then
+        for _, item in ipairs(char:GetChildren()) do
+            local n = item.Name:lower()
+            if n:find("ancient") or n:find("fragment") or n:find("shard") then return true end
+        end
+    end
+    for _, obj in ipairs(LP:GetChildren()) do
+        if obj:IsA("IntValue") or obj:IsA("NumberValue") then
+            local n = obj.Name:lower()
+            if (n:find("ancient") or n:find("fragment") or n:find("shard")) and obj.Value > 0 then return true end
+        end
+        if obj:IsA("Folder") or obj:IsA("Configuration") then
+            for _, child in ipairs(obj:GetChildren()) do
+                if child:IsA("IntValue") or child:IsA("NumberValue") then
+                    local n = child.Name:lower()
+                    if (n:find("ancient") or n:find("fragment") or n:find("shard")) and child.Value > 0 then return true end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function spawnAncientBoss()
+    pcall(function()
+        local mainRemote = game:GetService("ReplicatedStorage"):FindFirstChild("__Net")
+        if mainRemote then
+            mainRemote = mainRemote:FindFirstChild("MainRemote")
+            if mainRemote and mainRemote:IsA("RemoteEvent") then
+                mainRemote:FireServer("SpawnAncientMob", "Supreme Shadow Lord")
+            end
+        end
+    end)
+end
+
+local function findAncientBossInstance()
+    local gc = WS:FindFirstChild("__GAME_CONTENT")
+    if gc then
+        for _, m in ipairs(gc:GetDescendants()) do
+            if m:IsA("Model") and m ~= LP.Character then
+                local n = m.Name:lower()
+                if n:find("ancient") or n:find("boss") then
+                    if isMobAlive(m) then return m end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function ancientBossLoop()
+    while S.abossRunning and not env.NIStop do
+        if not hasAncientFragment() then
+            S.abossStatus = "No Fragment"
+            task.wait(10)
+            continue
+        end
+        local boss = findAncientBossInstance()
+        if boss then
+            S.abossStatus = "Attacking..."
+            local c = LP.Character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            if not hrp or not hum or hum.Health <= 0 then task.wait(1); continue end
+            local bossPos = getMobPosition(boss)
+            if not bossPos then task.wait(1); continue end
+            if not isCloseEnough(hrp, bossPos, 6) then
+                pcall(tweenTo, Vector3.new(bossPos.X, bossPos.Y, bossPos.Z), S.combatTweenSpeed)
+            end
+            if not S.abossRunning or env.NIStop then break end
+            local attackStart = tick()
+            while S.abossRunning and not env.NIStop and tick() - attackStart < 120 do
+                if not isMobAlive(boss) then S.abossStatus = "Defeated!"; task.wait(1); break end
+                local curC = LP.Character
+                local curHrp = curC and curC:FindFirstChild("HumanoidRootPart")
+                if not curHrp then break end
+                local t = curC:FindFirstChildOfClass("Tool")
+                if t then pcall(function() t:Activate(); t:Deactivate() end) end
+                task.wait(0.05)
+            end
+            continue
+        end
+        S.abossStatus = "Spawning..."
+        spawnAncientBoss()
+        task.wait(5)
+    end
+    S.abossStatus = "Stopped"
+end
+
+-- ===== RITUAL =====
+local function startRitual()
+    pcall(function()
+        local mainRemote = game:GetService("ReplicatedStorage"):FindFirstChild("__Net")
+        if mainRemote then
+            mainRemote = mainRemote:FindFirstChild("MainRemote")
+            if mainRemote and mainRemote:IsA("RemoteEvent") then
+                mainRemote:FireServer("StartRitual")
+            end
+        end
+    end)
+end
+
+local function ritualLoop()
+    while S.ritualRunning and not env.NIStop do
+        local signPos = Vector3.new(615.326, 3.700, 7851.791)
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp and (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(signPos.X, 0, signPos.Z)).Magnitude > 4 then
+            pcall(tweenTo, Vector3.new(signPos.X, signPos.Y, signPos.Z), S.combatTweenSpeed)
+        end
+        startRitual()
+        local cd = S.ritualCooldown or 120
+        local remaining = cd
+        while remaining > 0 and S.ritualRunning do
+            S.ritualStatus = "Next: " .. remaining .. "s"
+            task.wait(1)
+            remaining = remaining - 1
+        end
+    end
+    S.ritualStatus = "Stopped"
+end
+
+-- ===== REALM 3 AUTO UPGRADES =====
+local function fireUpgradeNoobMax(npcName)
+    pcall(function()
+        local Event = game:GetService("ReplicatedStorage").__Net.MainRemote
+        Event:FireServer("UpgradeNoobMax", npcName)
+    end)
+end
+
+local function fireUpgradeUpgradeMax(upgradeType, upgradeName)
+    pcall(function()
+        local Event = game:GetService("ReplicatedStorage").__Net.MainRemote
+        Event:FireServer("UpgradeUpgradeMax", upgradeType, upgradeName)
+    end)
+end
+
+local function fireShovelLevelUp()
+    pcall(function()
+        local Event = game:GetService("ReplicatedStorage").__Net.MainRemote
+        Event:FireServer("ShovelLevelUp")
+    end)
+end
+
+local function autoNoobPharaohLoop()
+    while S.autoNoobPharaoh and not env.NIStop do
+        fireUpgradeNoobMax("Pharaoh")
+        task.wait(1)
+    end
+end
+
+local function autoNoobMummyLoop()
+    while S.autoNoobMummy and not env.NIStop do
+        fireUpgradeNoobMax("Mummy")
+        task.wait(1)
+    end
+end
+
+local function autoNoobMerchantLoop()
+    while S.autoNoobMerchant and not env.NIStop do
+        fireUpgradeNoobMax("Merchant")
+        task.wait(1)
+    end
+end
+
+local function autoStrongerShovelsLoop()
+    while S.autoStrongerShovels and not env.NIStop do
+        fireUpgradeUpgradeMax("Sand", "StrongerShovels")
+        task.wait(1)
+    end
+end
+
+local function autoMoreSandLoop()
+    while S.autoMoreSand and not env.NIStop do
+        fireUpgradeUpgradeMax("Sand", "MoreSand")
+        task.wait(1)
+    end
+end
+
+local function autoLevelUpShovelLoop()
+    while S.autoLevelUpShovel and not env.NIStop do
+        fireShovelLevelUp()
+        task.wait(S.shovelLevelUpInterval)
+    end
+end
+
+-- ===== TIME TRIALS =====
+local function getNextTrialTime()
+    local now = os.time()
+    local tbl = os.date("*t", now)
+    local min = tbl.min
+    local sec = tbl.sec
+    local nextOpen
+
+    if min < 29 or (min == 29 and sec < 0) then
+        nextOpen = os.time({year=tbl.year, month=tbl.month, day=tbl.day, hour=tbl.hour, min=29, sec=0})
+    elseif min < 30 then
+        return 0, true
+    elseif min < 59 or (min == 59 and sec < 0) then
+        nextOpen = os.time({year=tbl.year, month=tbl.month, day=tbl.day, hour=tbl.hour, min=59, sec=0})
+    elseif min < 60 then
+        return 0, true
+    else
+        nextOpen = os.time({year=tbl.year, month=tbl.month, day=tbl.day, hour=tbl.hour+1, min=29, sec=0})
+    end
+
+    local diff = nextOpen - now
+    if diff <= 0 then return 0, true end
+    return diff, false
+end
+
+local function findTrialMob()
+    local myPos = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    local best, bestDist, bestHum
+    local gc = WS:FindFirstChild("__GAME_CONTENT")
+    if gc then
+        for _, folderName in ipairs({"Mobs", "Trials"}) do
+            local folder = gc:FindFirstChild(folderName)
+            if folder then
+                for _, m in ipairs(folder:GetChildren()) do
+                    if isMobAlive(m) then
+                        local p = getMobPosition(m)
+                        if p and myPos then
+                            local d = (p - myPos.Position).Magnitude
+                            if not bestDist or d < bestDist then
+                                best = m; bestDist = d
+                                bestHum = m:FindFirstChildOfClass("Humanoid")
+                                if not bestHum then
+                                    for _, dd in ipairs(m:GetDescendants()) do
+                                        if dd:IsA("Humanoid") then bestHum = dd; break end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best, bestHum
+end
+
+local function teleportToHardTrial()
+    local char = LP.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local targetPos = Vector3.new(907.9375, 11.014291763305664, 13443.76953125)
+    hrp.CFrame = CFrame.new(targetPos)
+    pcall(function() hrp.AssemblyLinearVelocity = Vector3.new() end)
+end
+
+local function fireOpenChest(chestType)
+    pcall(function()
+        local Event = game:GetService("ReplicatedStorage").__Net.MainRemote
+        Event:FireServer("OpenChest", chestType, 7)
+    end)
+end
+
+local function autoT1ChestLoop()
+    while S.autoT1Chest and not env.NIStop do
+        fireOpenChest("T1TrialChest")
+        task.wait(1)
+    end
+end
+
+local function autoT2ChestLoop()
+    while S.autoT2Chest and not env.NIStop do
+        fireOpenChest("T2TrialChest")
+        task.wait(1)
+    end
+end
+
+local function timeTrialLoop()
+    local wave = 0
+    local notified = false
+    local timeCache = 0
+    local timeOpen = false
+    local mob, mobHum
+
+    while S.ttRunning and not env.NIStop do
+        if tick() - timeCache > 5 then
+            timeCache = tick()
+            local diff, openNow = getNextTrialTime()
+            timeOpen = openNow
+            if not openNow then
+                local m, s = math.floor(diff/60), diff%60
+                S.ttStatus = "Hard next: " .. m .. ":" .. string.format("%02d", s)
+                if diff <= 120 and not notified then
+                    notified = true
+                    pcall(function()
+                        Rayfield:Notify({Title="Time Trial",Content="Trial in "..m..":"..string.format("%02d",s).."!",Duration=8,Image="info"})
+                    end)
+                end
+            end
+        end
+
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then task.wait(0.1); continue end
+
+        mob, mobHum = findTrialMob()
+        if not mob then
+            notified = false
+            wave = wave + 1
+            S.ttStatus = "Hard w"..wave.." cleared"
+            if timeOpen then
+                local portalFound = false
+                for _, obj in ipairs(WS:GetDescendants()) do
+                    if obj:IsA("BasePart") then
+                        local gui = obj:FindFirstChildOfClass("BillboardGui") or obj:FindFirstChildOfClass("SurfaceGui")
+                        if gui then
+                            for _, child in ipairs(gui:GetDescendants()) do
+                                if child:IsA("TextLabel") and (child.Text or ""):find("Time Trials", 1, true) then
+                                    S.ttStatus = "Entering portal..."
+                                    if not isCloseEnough(hrp, obj.Position, 4) then
+                                        pcall(tweenTo, Vector3.new(obj.Position.X, obj.Position.Y, obj.Position.Z), S.combatTweenSpeed)
+                                    end
+                                    if firetouchinterest then pcall(function() firetouchinterest(obj, hrp, 0); firetouchinterest(obj, hrp, 1) end) end
+                                    portalFound = true; break
+                                end
+                            end
+                        end
+                    end
+                    if portalFound then break end
+                end
+                if portalFound then task.wait(2); continue end
+            end
+            task.wait(1); continue
+        end
+
+        local mobPos = getMobPosition(mob)
+        if not mobPos then continue end
+
+        S.ttStatus = "Hard w"..(wave+1).." - "..mob.Name
+        if not isCloseEnough(hrp, mobPos, 5) then
+            glideTo(mobPos, S.combatTweenSpeed)
+        end
+
+        while S.ttRunning and mob do
+            if mobHum and mobHum.Health <= 0 then break end
+            if not isMobAlive(mob) then break end
+            task.wait(0.05)
+        end
+    end
+    S.ttStatus = "Stopped"
+end
+
+-- ===== RAYFIELD =====
+local Rayfield = nil
+local ok, result = pcall(function() return loadstring(game:HttpGet('https://sirius.menu/rayfield'))() end)
+if ok and result then Rayfield = result end
+if not Rayfield then
+    ok, result = pcall(function() return loadstring(game:HttpGet('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua'))() end)
+    if ok and result then Rayfield = result end
+end
+if not Rayfield then warn("[Sqays Hub] Failed to load Rayfield UI"); return end
+
+local Window = Rayfield:CreateWindow({
+    Name = "Sqays Hub - " .. gameName,
+    Icon = 0,
+    LoadingTitle = "Made by Exotic",
+    LoadingSubtitle = "Credits to Exotic | " .. execName,
+    ShowText = "Sqays Hub",
+    Theme = "DarkBlue",
+    ToggleUIKeybind = Enum.KeyCode.K,
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = true,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SqaysHub",
+        FileName = "Config"
+    },
+    Discord = {
+        Enabled = true,
+        Invite = "vV7Db9p2Zs",
+        RememberJoins = false
+    },
+    KeySystem = true,
+    KeySettings = {
+        Title = "Sqays Hub",
+        Subtitle = "Key System",
+        Note = "discord.gg/vV7Db9p2Zs",
+        FileName = "SqaysHubKey",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"Exotic"}
+    }
+})
+
+local Main = Window:CreateTab("⛏ Mine")
+local CombatTab = Window:CreateTab("⚔ Combat")
+local Realm3Tab = Window:CreateTab("🌍 Realm 3")
+local TTTab = Window:CreateTab("⏱ Time Trials")
+local SetTab = Window:CreateTab("⚙ Settings")
+
+-- ===== MINING TAB =====
+local tiers = {
+    {"🔷 High Tier", {"Voidsteel","Celestium","Aetherite","Ruby","Infinity"}},
+    {"🔶 Mid Tier",   {"Palladium","Cobalt","Uranium","Titanium","Platinum"}},
+    {"🔹 Low Tier",   {"Gold","Silver","Iron","Copper","Coal","Stone"}},
+}
+for _, tier in ipairs(tiers) do
+    Main:CreateSection(tier[1])
+    for _, n in ipairs(tier[2]) do
+        local flag = "m" .. n
+        Main:CreateToggle({
+            Name = n,
+            CurrentValue = S[flag] or false,
+            Flag = flag,
+            Callback = function(v)
+                S[flag] = v
+                if v then
+                    if not S.running then
+                        if not isInMine() then
+                            Rayfield:Notify({Title = "Sqays Hub", Content = "Enter the Mine realm first!", Duration = 4, Image = "info"})
+                            S[flag] = false
+                            return
+                        end
+                        S.running = true
+                        task.spawn(loop)
+                    end
+                else
+                    local any = false
+                    for _, n2 in ipairs(ORES) do if S["m"..n2] then any = true; break end end
+                    if not any then
+                        S.running = false
+                        if activeTween then pcall(function() activeTween:Cancel() end); activeTween = nil end
+                    end
+                end
+            end
+        })
+    end
+end
+
+-- ===== COMBAT TAB =====
+CombatTab:CreateSection("⚔ Mob Selection")
+for _, n in ipairs(MOBS) do
+    local flag = "c" .. n
+    CombatTab:CreateToggle({
+        Name = n,
+        CurrentValue = S[flag] or false,
+        Flag = flag,
+        Callback = function(v)
+            S[flag] = v
+            if v then
+                if not S.combatRunning then
+                    if not isInRealm3() then
+                        Rayfield:Notify({Title = "Sqays Hub", Content = "Enter Realm 3 first!", Duration = 4, Image = "info"})
+                        S[flag] = false
+                        return
+                    end
+                    S.combatRunning = true
+                    task.spawn(combatLoop)
+                end
+            else
+                local any = false
+                for _, n2 in ipairs(MOBS) do if S["c"..n2] then any = true; break end end
+                if not any then
+                    S.combatRunning = false
+                    if activeTween then pcall(function() activeTween:Cancel() end); activeTween = nil end
+                end
+            end
+        end
+    })
+end
+
+CombatTab:CreateSection("Combat Settings")
+CombatTab:CreateSlider({
+    Name = "Glide Speed (s)",
+    Range = {0.1, 2},
+    Increment = 0.1,
+    CurrentValue = S.combatTweenSpeed,
+    Callback = function(v) S.combatTweenSpeed = v end
+})
+
+CombatTab:CreateSection("👑 Ancient Boss")
+CombatTab:CreateToggle({
+    Name = "Auto Farm Ancient Boss",
+    CurrentValue = false,
+    Flag = "abossFarm",
+    Callback = function(v)
+        S.abossRunning = v
+        S.abossStatus = v and "Starting..." or "⏹ Stopped"
+        if v then
+            task.spawn(ancientBossLoop)
+        end
+    end
+})
+
+local bossStatusPara = CombatTab:CreateParagraph({
+    Title = "📊 Boss Status",
+    Content = "Status: Idle\nFrags: --"
+})
+task.spawn(function()
+    while true do
+        local status = S.abossStatus or "Idle"
+        local hasFrag = hasAncientFragment()
+        local fragStr = hasFrag and "Yes" or "No"
+        pcall(function()
+            bossStatusPara:Set({
+                Title = "Boss Status",
+                Content = "Status: " .. status .. "\nFragments: " .. fragStr
+            })
+        end)
+        task.wait(1)
+    end
+end)
+
+CombatTab:CreateSection("Ritual")
+CombatTab:CreateToggle({
+    Name = "Auto Start Ritual",
+    CurrentValue = false,
+    Flag = "autoRitual",
+    Callback = function(v)
+        S.ritualRunning = v
+        S.ritualStatus = v and "Starting..." or "Stopped"
+        if v then task.spawn(ritualLoop) end
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Ritual Cooldown (s)",
+    Range = {120, 500},
+    Increment = 10,
+    CurrentValue = 120,
+    Callback = function(v) S.ritualCooldown = v end
+})
+
+-- ===== REALM 3 TAB =====
+Realm3Tab:CreateSection("Auto Noob Upgrades")
+Realm3Tab:CreateToggle({
+    Name = "Auto Pharaoh",
+    CurrentValue = false,
+    Flag = "autoNoobPharaoh",
+    Callback = function(v)
+        S.autoNoobPharaoh = v
+        if v then task.spawn(autoNoobPharaohLoop) end
+    end
+})
+
+Realm3Tab:CreateToggle({
+    Name = "Auto Mummy",
+    CurrentValue = false,
+    Flag = "autoNoobMummy",
+    Callback = function(v)
+        S.autoNoobMummy = v
+        if v then task.spawn(autoNoobMummyLoop) end
+    end
+})
+
+Realm3Tab:CreateToggle({
+    Name = "Auto Merchant",
+    CurrentValue = false,
+    Flag = "autoNoobMerchant",
+    Callback = function(v)
+        S.autoNoobMerchant = v
+        if v then task.spawn(autoNoobMerchantLoop) end
+    end
+})
+
+Realm3Tab:CreateSection("Auto Sand Upgrades")
+Realm3Tab:CreateToggle({
+    Name = "Auto Stronger Shovels",
+    CurrentValue = false,
+    Flag = "autoStrongerShovels",
+    Callback = function(v)
+        S.autoStrongerShovels = v
+        if v then task.spawn(autoStrongerShovelsLoop) end
+    end
+})
+
+Realm3Tab:CreateToggle({
+    Name = "Auto More Sand",
+    CurrentValue = false,
+    Flag = "autoMoreSand",
+    Callback = function(v)
+        S.autoMoreSand = v
+        if v then task.spawn(autoMoreSandLoop) end
+    end
+})
+
+Realm3Tab:CreateSection("Auto Shovel Level Up")
+Realm3Tab:CreateToggle({
+    Name = "Auto Level Up Shovel",
+    CurrentValue = false,
+    Flag = "autoLevelUpShovel",
+    Callback = function(v)
+        S.autoLevelUpShovel = v
+        if v then task.spawn(autoLevelUpShovelLoop) end
+    end
+})
+
+Realm3Tab:CreateSlider({
+    Name = "Level Up Interval (s)",
+    Range = {1, 30},
+    Increment = 1,
+    CurrentValue = S.shovelLevelUpInterval,
+    Callback = function(v) S.shovelLevelUpInterval = v end
+})
+
+Realm3Tab:CreateSection("Trial Chests")
+Realm3Tab:CreateToggle({
+    Name = "Auto T1 Chest",
+    CurrentValue = false,
+    Flag = "autoT1Chest",
+    Callback = function(v)
+        S.autoT1Chest = v
+        if v then task.spawn(autoT1ChestLoop) end
+    end
+})
+
+Realm3Tab:CreateToggle({
+    Name = "Auto T2 Chest",
+    CurrentValue = false,
+    Flag = "autoT2Chest",
+    Callback = function(v)
+        S.autoT2Chest = v
+        if v then task.spawn(autoT2ChestLoop) end
+    end
+})
+
+-- ===== TIME TRIALS TAB =====
+TTTab:CreateSection("Teleport")
+TTTab:CreateButton({
+    Name = "Teleport to Hard Trial",
+    Callback = function()
+        teleportToHardTrial()
+        Rayfield:Notify({Title="Teleport",Content="Teleported to Hard Trial!",Duration=3,Image="info"})
+    end
+})
+
+TTTab:CreateSection("Auto Time Trial")
+TTTab:CreateToggle({
+    Name = "Auto Complete Time Trials",
+    CurrentValue = false,
+    Flag = "autoTT",
+    Callback = function(v)
+        if v then
+            S.ttRunning = true
+            S.ttStatus = "Starting..."
+            task.spawn(timeTrialLoop)
+        else
+            S.ttRunning = false
+            S.ttStatus = "Stopped"
+            if activeTween then pcall(function() activeTween:Cancel() end); activeTween = nil end
+        end
+    end
+})
+
+TTTab:CreateSection("Status")
+local statusPara = TTTab:CreateParagraph({
+    Title = "📊 Trial Status",
+    Content = "Status: Idle"
+})
+
+task.spawn(function()
+    while true do
+        local status = S.ttStatus or "Idle"
+        pcall(function()
+            statusPara:Set({
+                Title = "📊 Trial Status",
+                Content = "Status: " .. status
+            })
+        end)
+        task.wait(1)
+    end
+end)
+
+-- ===== SETTINGS TAB =====
+SetTab:CreateSection("Info")
+SetTab:CreateParagraph({Title = "📋 Session", Content = "Executor: " .. execName .. "\nGame: " .. gameName .. "\nPlayer: " .. LP.Name .. "\n\n🔗 Discord: discord.gg/vV7Db9p2Zs"})
+
+SetTab:CreateSection("Glide Speed")
+SetTab:CreateSlider({
+    Name = "Glide Speed (s)",
+    Range = {0.2, 2},
+    Increment = 0.1,
+    CurrentValue = S.tweenSpeed,
+    Callback = function(v) S.tweenSpeed = v end
+})
+
+SetTab:CreateSection("Ghost Mode")
+SetTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(v) noclip(v) end
+})
+
+SetTab:CreateSection("Script Control")
+SetTab:CreateButton({
+    Name = "Kill Script",
+    Callback = function()
+        env.NIStop = true
+        S.running = false
+        S.combatRunning = false
+        S.ttRunning = false
+        S.abossRunning = false
+        S.ritualRunning = false
+        S.autoNoobPharaoh = false
+        S.autoNoobMummy = false
+        S.autoNoobMerchant = false
+        S.autoStrongerShovels = false
+        S.autoMoreSand = false
+        S.autoLevelUpShovel = false
+        if activeTween then pcall(function() activeTween:Cancel() end); activeTween = nil end
+        if nc1 then nc1:Disconnect(); nc1 = nil end
+        if nc2 then nc2:Disconnect(); nc2 = nil end
+        if afkConn then afkConn:Disconnect(); afkConn = nil end
+        pcall(function() Rayfield:Destroy() end)
+        warn("[Sqays Hub] Script killed by user")
+    end
+})
+
+Rayfield:LoadConfiguration()
+task.wait(1)
+Rayfield:Notify({
+    Title = "Sqays Hub",
+    Content = "🔗 Discord: discord.gg/vV7Db9p2Zs\nKey is in the Discord!",
+    Duration = 10,
+    Image = "info"
+})
+task.spawn(function()
+    local flags = {}
+    pcall(function() flags = Window.Flags or {} end)
+
+    for _, n in ipairs(ORES) do
+        local flag = "m" .. n
+        if flags[flag] then S[flag] = true end
+    end
+    local anyMine = false; for _, n in ipairs(ORES) do if S["m"..n] then anyMine = true; break end end
+    if anyMine and isInMine() then
+        task.wait(2)
+        S.running = true; task.spawn(loop)
+    end
+
+    for _, n in ipairs(MOBS) do
+        local flag = "c" .. n
+        if flags[flag] then S[flag] = true end
+    end
+    local anyCombat = false; for _, n in ipairs(MOBS) do if S["c"..n] then anyCombat = true; break end end
+    if anyCombat and isInRealm3() then
+        task.wait(2)
+        S.combatRunning = true; task.spawn(combatLoop)
+    end
+
+    if flags["abossFarm"] then
+        task.wait(1)
+        S.abossRunning = true; task.spawn(ancientBossLoop)
+    end
+
+    if flags["autoRitual"] then
+        task.wait(1)
+        S.ritualRunning = true; task.spawn(ritualLoop)
+    end
+
+    if flags["autoTT"] then
+        task.wait(1)
+        S.ttRunning = true; task.spawn(timeTrialLoop)
+    end
+
+    if flags["autoNoobPharaoh"] then
+        task.wait(1)
+        S.autoNoobPharaoh = true; task.spawn(autoNoobPharaohLoop)
+    end
+
+    if flags["autoNoobMummy"] then
+        task.wait(1)
+        S.autoNoobMummy = true; task.spawn(autoNoobMummyLoop)
+    end
+
+    if flags["autoNoobMerchant"] then
+        task.wait(1)
+        S.autoNoobMerchant = true; task.spawn(autoNoobMerchantLoop)
+    end
+
+    if flags["autoStrongerShovels"] then
+        task.wait(1)
+        S.autoStrongerShovels = true; task.spawn(autoStrongerShovelsLoop)
+    end
+
+    if flags["autoMoreSand"] then
+        task.wait(1)
+        S.autoMoreSand = true; task.spawn(autoMoreSandLoop)
+    end
+
+    if flags["autoLevelUpShovel"] then
+        task.wait(1)
+        S.autoLevelUpShovel = true; task.spawn(autoLevelUpShovelLoop)
+    end
+
+    if flags["autoT1Chest"] then
+        task.wait(1)
+        S.autoT1Chest = true; task.spawn(autoT1ChestLoop)
+    end
+
+    if flags["autoT2Chest"] then
+        task.wait(1)
+        S.autoT2Chest = true; task.spawn(autoT2ChestLoop)
+    end
+end)
+
+print("[Sqays Hub] Ready - " .. execName .. " | " .. gameName)
