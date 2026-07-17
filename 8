@@ -1,0 +1,177 @@
+-- Sqays Hub - Hard Trial (Retry teleport + debug)
+if _G.HardTrialLoaded then
+    _G.HardTrialStop = true
+    task.wait(1)
+end
+_G.HardTrialLoaded = true
+_G.HardTrialStop = false
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local WS = game:GetService("Workspace")
+local LP = game:GetService("Players").LocalPlayer
+
+local JOIN_COORD = Vector3.new(907.9375, 11.014291763305664, 13443.76953125)
+
+local T = {
+    join = false,
+    grind = false,
+    leave = false,
+    leaveMin = 5,
+    teleportSuccess = false,
+    grinding = false,
+    lastJoin = -1,
+    lastGrind = -1
+}
+
+-- Hard trial odasını bul
+local function getRoom()
+    local gc = WS:FindFirstChild("__GAME_CONTENT")
+    if not gc then return nil end
+    local trials = gc:FindFirstChild("Trials")
+    if not trials then return nil end
+    return trials:FindFirstChild("HardTrialRoom")
+end
+
+-- Oda içindeki en yakın canlı mob
+local function findMob()
+    local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    local room = getRoom()
+    if not room then return nil end
+    local best, bestDist = nil, math.huge
+    for _, obj in ipairs(room:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Health > 0 then
+            local root = obj.Parent and (obj.Parent:FindFirstChild("HumanoidRootPart") or obj.Parent.PrimaryPart)
+            if root and root:IsA("BasePart") then
+                local d = (hrp.Position - root.Position).Magnitude
+                if d < bestDist then best, bestDist = root, d end
+            end
+        end
+    end
+    return best
+end
+
+local function leaveTrial()
+    pcall(function()
+        game:GetService("ReplicatedStorage"):FindFirstChild("__Net")
+            :FindFirstChild("MainRemote"):FireServer("LeaveTrial")
+    end)
+    T.teleportSuccess = false
+    print("[Hard Trial] Left trial.")
+end
+
+-- Teleport (tek seferlik)
+local function teleportOnce()
+    local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    hrp.CFrame = CFrame.new(JOIN_COORD)
+    hrp.AssemblyLinearVelocity = Vector3.new()
+    task.wait(0.5)
+    if (hrp.Position - JOIN_COORD).Magnitude > 15 then
+        warn("[Hard Trial] Teleport failed! Distance too large.")
+        return false
+    end
+    T.teleportSuccess = true
+    print("[Hard Trial] Teleport successful!")
+    if T.leave then
+        -- Önceki timer'ı iptal et, yeni timer başlat
+        task.delay(T.leaveMin * 60, leaveTrial)
+    end
+    return true
+end
+
+-- Join scheduler: 29:10 - 30:00 arası sürekli dene
+task.spawn(function()
+    while T.join and not _G.HardTrialStop do
+        local m, s = os.date("*t").min, os.date("*t").sec
+        -- Join penceresi: 29:10-30:00 veya 59:10-00:00
+        local inJoinWindow = false
+        if (m == 29 and s >= 10) or (m == 59 and s >= 10) then
+            inJoinWindow = true
+        end
+        if inJoinWindow and T.lastJoin ~= m then
+            T.lastJoin = m
+            print("[Hard Trial] Join window opened, trying to teleport...")
+            -- Denemeleri burada yapacağız
+            while T.join and not _G.HardTrialStop do
+                local success = teleportOnce()
+                if success then
+                    print("[Hard Trial] Teleport succeeded, exiting join window.")
+                    break
+                end
+                -- Hala 30:00 veya 00:00 olmadıysa tekrar dene
+                local now = os.date("*t")
+                if (now.min == 30 or now.min == 0) and now.sec >= 0 then
+                    -- Grind zamanı geldi, denemeyi bırak
+                    print("[Hard Trial] Grind time reached, stopping teleport attempts.")
+                    break
+                end
+                task.wait(2) -- 2 saniye sonra tekrar dene
+            end
+        end
+        if m ~= 29 and m ~= 59 then T.lastJoin = -1 end
+        task.wait(1)
+    end
+end)
+
+-- Grind scheduler (mob debug ile)
+task.spawn(function()
+    while T.grind and not _G.HardTrialStop do
+        local m, s = os.date("*t").min, os.date("*t").sec
+        if (m == 30 or m == 0) and s >= 0 and s <= 5 and T.lastGrind ~= m then
+            T.lastGrind = m
+            print("[Hard Trial] Grind time " .. m .. ":" .. s)
+            task.wait(2) -- mobların spawn olması için
+            if T.teleportSuccess and not T.grinding then
+                T.grinding = true
+                task.spawn(function()
+                    local noMobStart = nil
+                    while T.grind and T.teleportSuccess and not _G.HardTrialStop do
+                        local mob = findMob()
+                        if mob then
+                            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+                            if hum then hum:MoveTo(mob.Position) end
+                            noMobStart = nil
+                        else
+                            if not noMobStart then noMobStart = tick() end
+                            if tick() - noMobStart > 8 then
+                                -- 8 saniyedir mob yok, sayıyı debugla
+                                local room = getRoom()
+                                if room then
+                                    local count = 0
+                                    for _, obj in ipairs(room:GetDescendants()) do
+                                        if obj:IsA("Humanoid") and obj.Health > 0 then count = count + 1 end
+                                    end
+                                    print("[DEBUG] Alive mobs in HardTrialRoom: " .. count)
+                                end
+                                noMobStart = tick() -- tekrar 8 saniye sonra debug
+                            end
+                        end
+                        task.wait(0.3)
+                    end
+                    T.grinding = false
+                    print("[Hard Trial] Grind loop stopped.")
+                end)
+            else
+                print("[Hard Trial] Grind not started (teleportSuccess=" .. tostring(T.teleportSuccess) .. ")")
+            end
+        end
+        if m ~= 30 and m ~= 0 then T.lastGrind = -1 end
+        task.wait(1)
+    end
+end)
+
+-- UI
+local win = Rayfield:CreateWindow({
+    Name = "Hard Trial",
+    LoadingTitle = "Hard Trial Tester",
+    ConfigurationSaving = { Enabled = false }
+})
+local tab = win:CreateTab("Hard")
+tab:CreateToggle({ Name = "Auto Join", Flag = "join", Callback = function(v) T.join = v end })
+tab:CreateToggle({ Name = "Auto Grind", Flag = "grind", Callback = function(v) T.grind = v end })
+tab:CreateToggle({ Name = "Auto Leave", Flag = "leave", Callback = function(v) T.leave = v end })
+tab:CreateSlider({ Name = "Leave After (min)", Range = {1, 10}, Increment = 1, CurrentValue = 5,
+    Flag = "leaveMin", Callback = function(v) T.leaveMin = v end })
+
+print("[Hard Trial] Ready. Joins at xx:29:10-xx:30:00, Grinds at xx:30:00, Retries teleport until grind time.")
